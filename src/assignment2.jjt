@@ -1,0 +1,355 @@
+/*
+  SECTION ONE - OPTIONS 
+*/
+
+options { 
+  IGNORE_CASE = true;
+  JAVA_UNICODE_ESCAPE = true;
+  VISITOR = true;
+  NODE_DEFAULT_VOID = true;
+  MULTI = true;
+}
+
+/*
+  SECTION TWO - USER CODE 
+*/
+
+PARSER_BEGIN(CALParser)
+
+import java.util.*;
+
+public class CALParser {
+
+  public static Hashtable SymbolTable = new Hashtable();
+
+  public static void main(String [] args){
+
+        //Parser initialization
+        CALParser parser;
+
+        if(args.length == 0){
+          System.out.println ("CALParser: Reading input ...");
+          parser = new CALParser(System.in);
+        }
+        else if(args.length == 1){
+          System.out.println ("CALParser: Reading the file " + args[0] + " ..." );
+          try {
+            parser = new CALParser(new java.io.FileInputStream(args[0]));
+          }
+          catch(java.io.FileNotFoundException e) {
+            System.out.println ("CALParser: The file " + args[0] + " was not found.");
+            return;
+          }
+        }
+        else {
+          System.out.println ("CALParser:  You must use one of the following:");
+          System.out.println ("         java CALParser < file");
+          System.out.println ("Or");
+          System.out.println ("         java CALParser file");
+          return ;
+        }
+        try {
+          SimpleNode root = parser.programme();
+          System.out.println("---- Abstract Syntax Tree ----");
+          root.dump("");
+          System.out.println("---- End Syntax Tree ----");
+
+          System.out.println();
+
+          Visitor v = new Visitor();
+          root.jjtAccept(v, null);
+          System.out.println ("CCALParser: The input was read successfully.");
+        }
+        catch(ParseException e){
+          System.out.println ("CALParser: There was an error during the parse.");
+          System.out.println (e.getMessage());
+        }
+        catch(TokenMgrError e){
+          System.out.println ("CALParser: There was an error.");
+          System.out.println (e.getMessage());
+        }
+      }
+  }
+
+PARSER_END (CALParser)
+
+/*
+  SECTION THREE - TOKEN DEFINITIONS 
+*/
+
+TOKEN_MGR_DECLS :
+{
+  static int commentNesting = 0;
+}
+
+//Newline, space , tabs ignore 
+SKIP: 
+{ 
+      "\n" 
+    | "\r" 
+    | "\r\n"
+    | "\t"
+    | " "
+    | "\f"
+}
+
+SKIP :
+{
+    "/*" { commentNesting++; } : IN_COMMENT
+  | <"//" (~["\n"])* "\n">
+}
+
+<IN_COMMENT> SKIP : 
+{
+  "/*" { commentNesting++;}
+  | "*/" { commentNesting--;
+          if(commentNesting == 0)
+              SwitchTo(DEFAULT);
+          }
+  |<~[]>
+}
+
+/*
+  Accepted tokens used within the language defined through http://www.computing.dcu.ie/~davids/courses/CA4003/cal.pdf
+*/
+
+TOKEN :
+{
+    <COMMA:(",")>
+  | <SCOLON:(";")>
+  | <COLON:(":")>
+  | <ASIGN:(":=")>
+  | <OPBRA :("(")>
+  | <CLBRA:(")")>
+  | <PLUS:("+")>
+  | <MINUS:("-")>
+  | <TILDA:("~")>
+  | <OR:("|")>
+  | <AND:("&")>
+  | <EQ:("=")>
+  | <NOTEQ:("!=")>
+  | <LT:("<")>
+  | <LTEQ:("<=")>
+  | <GT:(">")>
+  | <GTEQ:(">=")>
+}
+
+TOKEN : 
+{
+    <VAR: "variable">
+  | <CONST: "constant">
+  | <RET: "return">
+  | <INT: "integer">
+  | <BOOL: "boolean">
+  | <VOID: "void">
+  | <MAIN: "main">
+  | <IF: "if">
+  | <ELSE: "else">
+  | <TRUE: "true">
+  | <FALSE: "false">
+  | <WHILE: "while">
+  | <BEGIN: "begin">
+  | <END: "end">
+  | <IS: "is">
+  | <SKI: ("skip")>
+}
+
+TOKEN : 
+{  
+    <IDENTIFIER: <LETTER>(<LETTER>|<DIGIT>|<SPECHAR>)*>
+  | <DIGIT: "0" | <MINUS> ["1" - "9"] (["0" - "9"])* | ["1" - "9"] (["0" - "9"])*> 
+  | <LETTER: (["a"-"z","A"-"Z"])>
+  | <SPECHAR : "_"> //special characters 
+}
+
+/*
+  SECTION FOUR 
+*/
+
+SimpleNode programme () #Programme: {} 
+{
+  declartionList()functionList()mainMethod(){return jjtThis;}
+}
+
+void declartionList() #DeclarationList: {}
+{ 
+  declartion()<SCOLON>declartionList() | {} 
+}
+
+void declartion() : {}
+{
+    variableDeclaration()
+  | constDeclaration() 
+}
+
+void variableDeclaration() #VarDeclaration: {}
+{
+  <VAR>identifier()<COLON>type()
+} 
+
+void constDeclaration() #ConstDeclaration: {}
+{
+  <CONST>identifier()<COLON>type()<ASIGN>expression()
+}
+
+void functionList() #FunctionList: {} 
+{ 
+  function()functionList() | {} 
+}
+
+void function() #Function: {}
+{ 
+  type() identifier()<OPBRA>paramList()<CLBRA>
+  functionBody()
+}
+
+void identifier() #ID: { Token t; }
+{
+    t = <IDENTIFIER> { jjtThis.value = t; }
+}
+
+void digit () #Digit: { Token t; }
+{
+    t = <DIGIT> { jjtThis.value = t; }
+}
+
+
+void functionBody() #FunctionBody(3): {}
+{ 
+  <IS>
+  declartionList()
+  <BEGIN>
+  statementBlock()
+  returnStatement()
+  <END>
+}
+
+void returnStatement() #ReturnStatement: {}
+{ 
+  <RET><OPBRA>(expression() | {} )<CLBRA><SCOLON> 
+}
+
+void type() #TypeValue: {Token t; }
+{ 
+      t = <INT> {jjtThis.value = t;}
+    | t = <BOOL> {jjtThis.value = t;}  
+    | t = <VOID> {jjtThis.value = t;}
+  
+}
+
+void paramList () #ParamList: {}
+{
+    ( identifier() <COLON> type() #Params(2) ( <COMMA> identifier() <COLON> type() #Params(2) )* | {} )
+}
+
+void mainMethod() #Main: {}
+{ 
+  <MAIN>
+  <BEGIN>
+  declartionList()
+  statementBlock()
+  <END>
+}
+
+void statementBlock() #StatementBlock: {}
+{
+  statement()statementBlock() | {} 
+}
+
+void statement (): {}
+{  
+    ( LOOKAHEAD(2)
+        assignment() <SCOLON>
+        | getArgs()<SCOLON>
+       | <BEGIN> statementBlock() <END>
+       | <IF> condition() #Condition <BEGIN> statementBlock()<END>
+          <ELSE> <BEGIN> statementBlock() <END> #If(3) 
+       | <WHILE> condition() <BEGIN> statementBlock() <END> #While(2)
+       | <SKI> <SCOLON> 
+    )
+}
+
+void simple_expression() : {}
+{
+    binOp() expression()
+  | {} 
+}
+
+void expression () : {}
+{
+  
+    fragment()simple_expression()
+  | <OPBRA>expression()<CLBRA> simple_expression()
+  | getArgs() simple_expression()
+  
+}
+
+void getArgs() #FunctionCall: {}
+{ 
+  identifier()[<OPBRA> argList() <CLBRA>]
+}
+
+void binOp(): {}
+{
+     <PLUS> 
+    | <MINUS> 
+}
+
+void fragment(): {}
+{ 
+   digit()
+  | boolOp()
+  | <MINUS> identifier() 
+}
+
+void condition(): {}
+{
+  simple_condition()(<OR>condition() #Or(2) | <AND>condition() #And(2) | {})
+}
+
+
+//Because of the two conditions in test6 each side of and 
+void simple_condition() : {} 
+{ 
+    <TILDA> condition()(<OR>condition() #Or(2)| <AND>condition() #And(2)| {})
+  | LOOKAHEAD(3) <OPBRA> condition() <CLBRA> (<OR> condition()  #Or(2) | <AND> condition() #And(2)| {})
+  | expression() compOp() expression() (<OR> condition() #Or(2) | <AND> condition() #And(2)| {})
+
+}
+
+void compOp () #Comparing: {Token t;}
+{
+      t = <EQ> { jjtThis.value = t; }  
+    | t = <NOTEQ> { jjtThis.value = t; }
+    | t = <LT> { jjtThis.value = t; }
+    | t = <LTEQ> { jjtThis.value = t; }
+    | t = <GT> { jjtThis.value = t; }
+    | t = <GTEQ> { jjtThis.value = t; } 
+ 
+}
+
+void assignment() #Assignment: {}
+{
+    identifier() <ASIGN> expression()
+}
+
+void boolOp () #Boolean: {Token t;}
+{
+      t = <TRUE> {jjtThis.value = t;} 
+    | t = <FALSE> {jjtThis.value = t;}
+}
+
+void argList () : {}
+{
+    nemp_argument_list() | {}
+}
+
+void nemp_argument_list() #ArgumentList: {}
+{
+   identifier() #Arg(1) (<COMMA>identifier() #Arg(1) | {} )
+}
+
+
+
+
+
