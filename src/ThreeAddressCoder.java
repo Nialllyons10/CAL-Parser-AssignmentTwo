@@ -2,14 +2,17 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Set;
+import java.io.FileOutputStream;
+import java.io.FileNotFoundException;
+import java.io.PrintStream;
 
 public class ThreeAddressCoder implements CALParserVisitor {
 
     private String currentLable = "L0";
     private String previousLable;
-    private int labelCount = 0;
-    private LinkedHashMap<String, ArrayList<AddressCode>> addressCodes = new LinkedHashMap<>();
-    private HashMap<String, String> jumpLables = new HashMap<>();
+    private int theLabelCounter = 0;
+    private LinkedHashMap<String, ArrayList<AddressCode>> theAddrCodes = new LinkedHashMap<>();
+    private HashMap<String, String> theJumpLables = new HashMap<>();
 
     @Override
     public Object visit(SimpleNode node, Object data) {
@@ -19,14 +22,23 @@ public class ThreeAddressCoder implements CALParserVisitor {
 
     @Override
     public Object visit(ASTProgramme node, Object data) {
-        System.out.println("---- 3-address code representation ----");
+        String filename = "TAC.ir";
+        try {
+            PrintStream out = new PrintStream(new FileOutputStream(filename)); 
+            System.setOut(out);
+        }
+        catch (FileNotFoundException e) {
+                e.printStackTrace();
+        }
+
+        System.out.println("****** THREE-ADDRESS CODE REPRESENTATION *****");
         node.childrenAccept(this, data);
 
-        Set keys = addressCodes.keySet();
+        Set keys = theAddrCodes.keySet();
         if(keys.size() > 0) {
             for (Object key : keys) {
                 String s = (String) key;
-                ArrayList<AddressCode> a = addressCodes.get(s);
+                ArrayList<AddressCode> a = theAddrCodes.get(s);
                 System.out.println(s);
                 
                 for (AddressCode addressCode : a) {
@@ -34,9 +46,9 @@ public class ThreeAddressCoder implements CALParserVisitor {
                 }
             }
         } else {
-            System.out.println("Nothing declared");
+            System.out.println("NO THREE-ADDRESS CODE REPRESENTATION");
         }
-        System.out.println("---- End 3-address code representation ----");
+        System.out.println("***** END THREE-ADDRESS CODE REPRESENTATION *****");
 
         return null;
     }
@@ -45,21 +57,21 @@ public class ThreeAddressCoder implements CALParserVisitor {
 
     @Override
     public Object visit(ASTMain node, Object data) {
-        currentLable = "L" + (labelCount + 1);
+        currentLable = "L" + (theLabelCounter + 1);
         previousLable = currentLable;
 
         node.childrenAccept(this, data);
 
         currentLable = previousLable;
-        ArrayList<AddressCode> currentAddressCodes = addressCodes.get(currentLable);
-        if(currentAddressCodes == null) {
-            currentAddressCodes = new ArrayList<>();
+        ArrayList<AddressCode> currAddrCodes = theAddrCodes.get(currentLable);
+        if(currAddrCodes == null) {
+            currAddrCodes = new ArrayList<>();
         }
-        AddressCode endMain = new AddressCode();
-        endMain.address1 = "END";
-        currentAddressCodes.add(endMain);
-        addressCodes.put(currentLable,currentAddressCodes);
-        labelCount++;
+        AddressCode endOfMain = new AddressCode();
+        endOfMain.address1 = "END";
+        currAddrCodes.add(endOfMain);
+        theAddrCodes.put(currentLable,currAddrCodes);
+        theLabelCounter++;
 
         return null;
     }
@@ -73,25 +85,25 @@ public class ThreeAddressCoder implements CALParserVisitor {
     @Override
     public Object visit(ASTFunction node, Object data) {
         previousLable = currentLable;
-        currentLable = "L" + (labelCount + 1);
+        currentLable = "L" + (theLabelCounter + 1);
 
-        jumpLables.put((String) node.jjtGetChild(1).jjtAccept(this, null), currentLable);
+        theJumpLables.put((String) node.jjtGetChild(1).jjtAccept(this, null), currentLable);
 
         node.childrenAccept(this, data);
 
-        ArrayList<AddressCode> currentAddressCodes = addressCodes.get(currentLable);
-        if(currentAddressCodes == null) {
-            currentAddressCodes = new ArrayList<>();
+        ArrayList<AddressCode> currAddrCodes = theAddrCodes.get(currentLable);
+        if(currAddrCodes == null) {
+            currAddrCodes = new ArrayList<>();
         }
 
-        AddressCode returnAddressCode = new AddressCode();
-        returnAddressCode.address1 = "return";
+        AddressCode retAddrCode = new AddressCode();
+        retAddrCode.address1 = "return";
 
-        currentAddressCodes.add(returnAddressCode);
-        addressCodes.put(currentLable, currentAddressCodes);
+        currAddrCodes.add(retAddrCode);
+        theAddrCodes.put(currentLable, currAddrCodes);
 
         currentLable = previousLable;
-        labelCount++;
+        theLabelCounter++;
 
         return null;
     }
@@ -125,18 +137,18 @@ public class ThreeAddressCoder implements CALParserVisitor {
 
     @Override
     public Object visit(ASTConstDeclaration node, Object data) {
-        ArrayList<AddressCode> currentAddressCodes = addressCodes.get(currentLable);
-        if (currentAddressCodes == null) {
-            currentAddressCodes = new ArrayList<>();
+        ArrayList<AddressCode> currAddrCodes = theAddrCodes.get(currentLable);
+        if (currAddrCodes == null) {
+            currAddrCodes = new ArrayList<>();
         }
 
         AddressCode ac = new AddressCode();
-        ac.address1 = "="; 
+        ac.address1 = " = "; 
         ac.address2 = (node.jjtGetChild(0).jjtAccept(this, null).toString());
         ac.address3 = (node.jjtGetChild(1).jjtAccept(this, null).toString());
         ac.address4 = (node.jjtGetChild(2).jjtAccept(this, null).toString());
-        currentAddressCodes.add(ac);
-        addressCodes.put(currentLable, currentAddressCodes);
+        currAddrCodes.add(ac);
+        theAddrCodes.put(currentLable, currAddrCodes);
         return null;
     }
 
@@ -149,18 +161,17 @@ public class ThreeAddressCoder implements CALParserVisitor {
     public Object visit(ASTStatementBlock node, Object data) {
      
         if(data instanceof ASTIf || data instanceof ASTWhile){
-            currentLable = "L" + (labelCount + 1);
-            labelCount++;
+            currentLable = "L" + (theLabelCounter + 1);
+            theLabelCounter++;
         }
         node.childrenAccept(this, data);
         if(data instanceof ASTIf || data instanceof ASTWhile){
             if (node.jjtGetNumChildren() > 0) {
                 String hash = node.jjtGetChild(0).hashCode() + "";
-                jumpLables.put(hash,currentLable);
+                theJumpLables.put(hash,currentLable);
             }
         }
-                
-        
+    
         return null;
     }
 
@@ -173,56 +184,56 @@ public class ThreeAddressCoder implements CALParserVisitor {
     @Override
     public Object visit(ASTIf node, Object data) {
         previousLable = currentLable;
-        ArrayList<AddressCode> currentAddressCodes = addressCodes.get(currentLable);
-        if(currentAddressCodes == null) {
-            currentAddressCodes = new ArrayList<>();
+        ArrayList<AddressCode> currAddrCodes = theAddrCodes.get(currentLable);
+        if(currAddrCodes == null) {
+            currAddrCodes = new ArrayList<>();
         }
 
-        AddressCode returnAddressCode = new AddressCode();
-        returnAddressCode.address1 = "if";
-        currentAddressCodes.add(returnAddressCode);
-        labelCount++;
+        AddressCode retAddrCode = new AddressCode();
+        retAddrCode.address1 = "if";
+        currAddrCodes.add(retAddrCode);
+        theLabelCounter++;
         String currentIfLable = currentLable;
-        int currentLableCount = labelCount;
+        int currentLableCount = theLabelCounter;
         node.childrenAccept(this, node);
 
         currentLable = currentIfLable;
         String ifJumpLable = "L" + (currentLableCount + 1);
         String elseJumpLable = "L" + (currentLableCount + 2);
-        String jumpToLable = "L" + (currentLableCount + 3);
-        addressCodes.put(currentLable, currentAddressCodes);
-        AddressCode gotoIf = new AddressCode();
-        gotoIf.address1 = "goto";
-        gotoIf.address2 = (jumpLables.get(node.jjtGetChild(1).jjtGetChild(0).hashCode() + ""));
+        String jumpToThisLables = "L" + (currentLableCount + 3);
+        theAddrCodes.put(currentLable, currAddrCodes);
+        AddressCode goToTheIf = new AddressCode();
+        goToTheIf.address1 = "goto";
+        goToTheIf.address2 = (theJumpLables.get(node.jjtGetChild(1).jjtGetChild(0).hashCode() + ""));
         AddressCode gotoElse = new AddressCode();
         gotoElse.address1 = "goto";
-        gotoElse.address2 = (jumpLables.get(node.jjtGetChild(2).jjtGetChild(0).hashCode() + ""));
+        gotoElse.address2 = (theJumpLables.get(node.jjtGetChild(2).jjtGetChild(0).hashCode() + ""));
 
 
-        AddressCode endIf = new AddressCode();
-        endIf.address1 = (jumpToLable);
+        AddressCode enderIf = new AddressCode();
+        enderIf.address1 = (jumpToThisLables);
 
         AddressCode gotoEnd = new AddressCode();
         gotoEnd.address1 = "goto";
-        gotoEnd.address2 = (jumpToLable);
+        gotoEnd.address2 = (jumpToThisLables);
 
-        currentAddressCodes.add(gotoIf);
-        currentAddressCodes.add(gotoElse);
-        currentAddressCodes.add(endIf);
-        addressCodes.put(currentLable, currentAddressCodes);
+        currAddrCodes.add(goToTheIf);
+        currAddrCodes.add(gotoElse);
+        currAddrCodes.add(enderIf);
+        theAddrCodes.put(currentLable, currAddrCodes);
 
-        currentAddressCodes = addressCodes.get(ifJumpLable);
-        if(currentAddressCodes == null) {
-            currentAddressCodes = new ArrayList<>();
+        currAddrCodes = theAddrCodes.get(ifJumpLable);
+        if(currAddrCodes == null) {
+            currAddrCodes = new ArrayList<>();
         }
-        currentAddressCodes.add(gotoEnd);
-        addressCodes.put(ifJumpLable, currentAddressCodes);
-        currentAddressCodes = addressCodes.get(elseJumpLable);
-        if(currentAddressCodes == null) {
-            currentAddressCodes = new ArrayList<>();
+        currAddrCodes.add(gotoEnd);
+        theAddrCodes.put(ifJumpLable, currAddrCodes);
+        currAddrCodes = theAddrCodes.get(elseJumpLable);
+        if(currAddrCodes == null) {
+            currAddrCodes = new ArrayList<>();
         }
-        currentAddressCodes.add(gotoEnd);
-        addressCodes.put(elseJumpLable, currentAddressCodes);
+        currAddrCodes.add(gotoEnd);
+        theAddrCodes.put(elseJumpLable, currAddrCodes);
 
         return null;
     }
@@ -230,82 +241,77 @@ public class ThreeAddressCoder implements CALParserVisitor {
     @Override
     public Object visit(ASTWhile node, Object data) {
         previousLable = currentLable;
-        ArrayList<AddressCode> currentAddressCodes = addressCodes.get(currentLable);
-        if(currentAddressCodes == null) {
-            currentAddressCodes = new ArrayList<>();
+        ArrayList<AddressCode> currAddrCodes = theAddrCodes.get(currentLable);
+        if(currAddrCodes == null) {
+            currAddrCodes = new ArrayList<>();
         }
-        labelCount++;
-        String startWhile = "L" + (labelCount + 1);
+        theLabelCounter++;
+        String startWhile = "L" + (theLabelCounter + 1);
         AddressCode startWhileAddressCode = new AddressCode();
         startWhileAddressCode.address1 = (startWhile);
-        AddressCode returnAddressCode = new AddressCode();
-        returnAddressCode.address1 = "while";
-        currentAddressCodes.add(startWhileAddressCode);
-        currentAddressCodes.add(returnAddressCode);
-        labelCount++;
+        AddressCode retAddrCode = new AddressCode();
+        retAddrCode.address1 = "while";
+        currAddrCodes.add(startWhileAddressCode);
+        currAddrCodes.add(retAddrCode);
+        theLabelCounter++;
         node.childrenAccept(this, node);
 
         currentLable = previousLable;
-        String ifJumpLable = "L" + (labelCount);
-        labelCount++;
-        String jumpToLable = "L" + (labelCount);
-        addressCodes.put(currentLable, currentAddressCodes);
-        AddressCode gotoIf = new AddressCode();
-        gotoIf.address1 = "goto";
-        gotoIf.address2 =(jumpLables.get(node.jjtGetChild(1).jjtGetChild(0).hashCode() + ""));
+        String ifJumpLable = "L" + (theLabelCounter);
+        theLabelCounter++;
+        String jumpToThisLables = "L" + (theLabelCounter);
+        theAddrCodes.put(currentLable, currAddrCodes);
+        AddressCode goToTheIf = new AddressCode();
+        goToTheIf.address1 = "goto";
+        goToTheIf.address2 =(theJumpLables.get(node.jjtGetChild(1).jjtGetChild(0).hashCode() + ""));
 
-        AddressCode endIf = new AddressCode();
-        endIf.address1 = (jumpToLable);
+        AddressCode enderIf = new AddressCode();
+        enderIf.address1 = (jumpToThisLables);
 
-        AddressCode gotoStart = new AddressCode();
-        gotoStart.address1 = "goto";
-        gotoStart.address2 = (startWhile);
+        AddressCode gotoTheStart = new AddressCode();
+        gotoTheStart.address1 = "goto";
+        gotoTheStart.address2 = (startWhile);
 
-        currentAddressCodes.add(gotoIf);
-        addressCodes.put(currentLable, currentAddressCodes);
+        currAddrCodes.add(goToTheIf);
+        theAddrCodes.put(currentLable, currAddrCodes);
 
-        currentAddressCodes = addressCodes.get(ifJumpLable);
-        if(currentAddressCodes == null) {
-            currentAddressCodes = new ArrayList<>();
+        currAddrCodes = theAddrCodes.get(ifJumpLable);
+        if(currAddrCodes == null) {
+            currAddrCodes = new ArrayList<>();
         }
-        currentAddressCodes.add(gotoStart);
-        addressCodes.put(ifJumpLable, currentAddressCodes);
+        currAddrCodes.add(gotoTheStart);
+        theAddrCodes.put(ifJumpLable, currAddrCodes);
 
         currentLable = previousLable;
-        labelCount++;
+        theLabelCounter++;
 
         return null;
     }
-
-
-
     
     @Override
     public Object visit(ASTFunctionCall node, Object data) {
-        ArrayList<AddressCode> currentAddressCodes = addressCodes.get(currentLable);
-        if(currentAddressCodes == null) {
-            currentAddressCodes = new ArrayList<>();
+        ArrayList<AddressCode> currAddrCodes = theAddrCodes.get(currentLable);
+        if(currAddrCodes == null) {
+            currAddrCodes = new ArrayList<>();
         }
 
-        AddressCode functionCallAddressCode = new AddressCode();
-        functionCallAddressCode.address1 = ("functionCall");
-        functionCallAddressCode.address2 = (node.jjtGetChild(0).jjtAccept(this, null).toString());
+        AddressCode funcCallAddrCode = new AddressCode();
+        funcCallAddrCode.address1 = ("functionCall");
+        funcCallAddrCode.address2 = (node.jjtGetChild(0).jjtAccept(this, null).toString());
         if(node.jjtGetNumChildren() > 1) {
-            functionCallAddressCode.address3 = (node.jjtGetChild(1).jjtGetChild(0).jjtGetChild(0).jjtAccept(this, null).toString());
+            funcCallAddrCode.address3 = (node.jjtGetChild(1).jjtGetChild(0).jjtGetChild(0).jjtAccept(this, null).toString());
         }
-        currentAddressCodes.add(functionCallAddressCode);
+        currAddrCodes.add(funcCallAddrCode);
 
-        AddressCode gotoAddressCode = new AddressCode();
-        gotoAddressCode.address1 = ("goto");
-        gotoAddressCode.address2 = (jumpLables.get(node.jjtGetChild(0).jjtAccept(this,null)));
+        AddressCode goToThisAddrCode = new AddressCode();
+        goToThisAddrCode.address1 = ("goto");
+        goToThisAddrCode.address2 = (theJumpLables.get(node.jjtGetChild(0).jjtAccept(this,null)));
 
-        currentAddressCodes.add(gotoAddressCode);
-        addressCodes.put(currentLable, currentAddressCodes);
+        currAddrCodes.add(goToThisAddrCode);
+        theAddrCodes.put(currentLable, currAddrCodes);
 
         return null;
     }
-
-    
 
     @Override
     public Object visit(ASTArgumentList node, Object data) {
@@ -334,56 +340,56 @@ public class ThreeAddressCoder implements CALParserVisitor {
 
     @Override
     public Object visit(ASTOr node, Object data) {
-        ArrayList<AddressCode> currentAddressCodes = addressCodes.get(currentLable);
-        if(currentAddressCodes == null) {
-            currentAddressCodes = new ArrayList<>();
+        ArrayList<AddressCode> currAddrCodes = theAddrCodes.get(currentLable);
+        if(currAddrCodes == null) {
+            currAddrCodes = new ArrayList<>();
         }
 
-        AddressCode orAddressCode = new AddressCode();
-        orAddressCode.address1 = "||";
+        AddressCode orAddrCode = new AddressCode();
+        orAddrCode.address1 = "||";
         if(node.jjtGetChild(0) instanceof ASTDigit || node.jjtGetChild(0) instanceof ASTBoolean || node.jjtGetChild(0) instanceof ASTID) {
-            orAddressCode.address2 = (node.jjtGetChild(0).jjtAccept(this, null).toString());
+            orAddrCode.address2 = (node.jjtGetChild(0).jjtAccept(this, null).toString());
         }
         else{
             node.childrenAccept(this, data);
         }
         if(node.jjtGetChild(1) instanceof ASTDigit || node.jjtGetChild(1) instanceof ASTBoolean || node.jjtGetChild(1) instanceof ASTID) {
-            orAddressCode.address3 = (node.jjtGetChild(1).jjtAccept(this, null).toString());
+            orAddrCode.address3 = (node.jjtGetChild(1).jjtAccept(this, null).toString());
         }
         else {
             node.childrenAccept(this, data);
         }
 
-        currentAddressCodes.add(orAddressCode);
-        addressCodes.put(currentLable, currentAddressCodes);
+        currAddrCodes.add(orAddrCode);
+        theAddrCodes.put(currentLable, currAddrCodes);
 
         return null;
     }
 
     @Override
     public Object visit(ASTAnd node, Object data) {
-        ArrayList<AddressCode> currentAddressCodes = addressCodes.get(currentLable);
-        if(currentAddressCodes == null) {
-            currentAddressCodes = new ArrayList<>();
+        ArrayList<AddressCode> currAddrCodes = theAddrCodes.get(currentLable);
+        if(currAddrCodes == null) {
+            currAddrCodes = new ArrayList<>();
         }
 
-        AddressCode andAddressCode = new AddressCode();
-        andAddressCode.address1 = "&&";
+        AddressCode andAddrCode = new AddressCode();
+        andAddrCode.address1 = "&&";
         if(node.jjtGetChild(0) instanceof ASTDigit || node.jjtGetChild(0) instanceof ASTBoolean || node.jjtGetChild(0) instanceof ASTID) {
-            andAddressCode.address2 = (node.jjtGetChild(0).jjtAccept(this, null).toString());
+            andAddrCode.address2 = (node.jjtGetChild(0).jjtAccept(this, null).toString());
         }
         else{
             node.childrenAccept(this, data);
         }
         if(node.jjtGetChild(1) instanceof ASTDigit || node.jjtGetChild(1) instanceof ASTBoolean || node.jjtGetChild(1) instanceof ASTID) {
-            andAddressCode.address3 = (node.jjtGetChild(1).jjtAccept(this, null).toString());
+            andAddrCode.address3 = (node.jjtGetChild(1).jjtAccept(this, null).toString());
         }
         else {
             node.childrenAccept(this, data);
         }
 
-        currentAddressCodes.add(andAddressCode);
-        addressCodes.put(currentLable, currentAddressCodes);
+        currAddrCodes.add(andAddrCode);
+        theAddrCodes.put(currentLable, currAddrCodes);
 
         return null;
     }
@@ -393,30 +399,28 @@ public class ThreeAddressCoder implements CALParserVisitor {
         return ((Token) node.jjtGetValue()).image;
     }
 
-    
-
     @Override
     public Object visit(ASTAssignment node, Object data) {
-        ArrayList<AddressCode> currentAddressCodes = addressCodes.get(currentLable);
-        if(currentAddressCodes == null) {
-            currentAddressCodes = new ArrayList<>();
+        ArrayList<AddressCode> currAddrCodes = theAddrCodes.get(currentLable);
+        if(currAddrCodes == null) {
+            currAddrCodes = new ArrayList<>();
         }
 
-        AddressCode asignAddressCode = new AddressCode();
-        asignAddressCode.address1 = "=";
-        asignAddressCode.address2 = (node.jjtGetChild(0).jjtAccept(this, null).toString());
+        AddressCode assignmentAddrCode = new AddressCode();
+        assignmentAddrCode.address1 = "=";
+        assignmentAddrCode.address2 = (node.jjtGetChild(0).jjtAccept(this, null).toString());
         
 
         if(!(node.jjtGetChild(1) instanceof ASTID) && !(node.jjtGetChild(1) instanceof ASTDigit) && !(node.jjtGetChild(1) instanceof ASTBoolean)){
             node.childrenAccept(this, data);
-            currentAddressCodes = addressCodes.get(currentLable);
+            currAddrCodes = theAddrCodes.get(currentLable);
         }
         else{
-            asignAddressCode.address3 = (node.jjtGetChild(1).jjtAccept(this, null).toString());
+            assignmentAddrCode.address3 = (node.jjtGetChild(1).jjtAccept(this, null).toString());
         }
 
-        currentAddressCodes.add(asignAddressCode);
-        addressCodes.put(currentLable, currentAddressCodes);
+        currAddrCodes.add(assignmentAddrCode);
+        theAddrCodes.put(currentLable, currAddrCodes);
 
         return null;
     }
@@ -426,13 +430,4 @@ public class ThreeAddressCoder implements CALParserVisitor {
         return ((Token) node.jjtGetValue()).image;
     }
 
-    //Get boolean operators for the notAddressCode
-    private String getBooleanOperator(Node node){
-        if (node instanceof ASTAnd) {
-            return "&&";
-        } else if (node instanceof ASTOr) {
-            return "||";
-        }
-        return "";
-    }
 }

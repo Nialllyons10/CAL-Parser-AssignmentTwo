@@ -50,14 +50,15 @@ public class CALParser {
         }
         try {
           SimpleNode root = parser.programme();
-          System.out.println("---- Abstract Syntax Tree ----");
+          System.out.println("***** ABSTRACT SYNTAX TREE *****");
           root.dump("");
-          System.out.println("---- End Syntax Tree ----");
+          System.out.println("***** END SYNTAX TREE *****");
 
           System.out.println();
-
+      
           Visitor v = new Visitor();
           root.jjtAccept(v, null);
+          System.out.println();
           System.out.println ("CCALParser: The input was read successfully.");
         }
         catch(ParseException e){

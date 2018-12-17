@@ -3,5 +3,5 @@ public enum DataType {
     CONST, 
     VAR, 
     FUNC, 
-    NAS
+    NOT_A_SYM
 }

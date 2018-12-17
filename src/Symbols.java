@@ -8,7 +8,7 @@ class Symbols {
     private DataType symbolType;
     private String scope;
     private LinkedHashMap<String, LinkedList<VarTypes>> values;
-    private int numArgs = -1;
+    private int numberOfArgs = -1;
     private boolean isRead = false;
     private boolean isCalled = false;
 
@@ -16,7 +16,6 @@ class Symbols {
         values = new LinkedHashMap<>();
     }
 
-    // Getter and Setters
     void setName(Token n0) {
         name = n0;
     }
@@ -58,11 +57,11 @@ class Symbols {
     }
 
     void setNumArgs(int na0) {
-        numArgs = na0;
+        numberOfArgs = na0;
     }
 
     int getNumArgs() {
-        return numArgs;
+        return numberOfArgs;
     }
 
     void setIsRead(boolean i0) {
@@ -81,60 +80,52 @@ class Symbols {
         return isCalled;
     }
 
-    // get the value of the token by its name
     LinkedList<VarTypes> getValue(String name) {
         return values.get(name);
     }
 
-    // add a value of a token by its name
     void addValue(String name, VarTypes value) {
-        LinkedList<VarTypes> variables =  values.get(name);
-        if(variables == null){
-            variables = new LinkedList<>();
+        LinkedList<VarTypes> vars =  values.get(name);
+        if(vars == null){
+            vars = new LinkedList<>();
         }
-        variables.add(value);
-        values.put(name, variables);
+        vars.add(value);
+        values.put(name, vars);
     }
-
-    String getFirstValue(String name){
-        return values.get(name).getFirst().getValue();
-    }
-
-    
 
     String printValues(){
-        StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.append("{");
-        for (Map.Entry<String, LinkedList<VarTypes>> entry : values.entrySet()) {
-            String key = entry.getKey();
-            for (VarTypes variable : entry.getValue()) {
-                stringBuilder.append(variable.getValue()).append(":").append(variable.getType()).append(",");
+        StringBuilder buildTheString = new StringBuilder();
+        buildTheString.append("{ ");
+        for (Map.Entry<String, LinkedList<VarTypes>> entryType : values.entrySet()) {
+            String key = entryType.getKey();
+            for (VarTypes vars : entryType.getValue()) {
+                buildTheString.append(vars.getValue()).append(": ").append(vars.getType()).append(", ");
             }
         }
-        stringBuilder.deleteCharAt(stringBuilder.length()-1);
-        stringBuilder.append("}");
-        return stringBuilder.toString();
+        buildTheString.deleteCharAt(buildTheString.length()-1);
+        buildTheString.append(" }");
+        return buildTheString.toString();
     }
 
     String getSymbolString(){
-        StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.append("Name: ").append(getName()).append("\n");
-        stringBuilder.append("\t ").append("SymbolType: ").append(getSymbolType()).append("\n");
+        StringBuilder buildTheString = new StringBuilder();
+        buildTheString.append("Name: ").append(getName()).append("\n");
+        buildTheString.append("\t ").append("The SymbolType: ").append(getSymbolType()).append("\n");
         if(getSymbolType().equals(DataType.FUNC)){
-            stringBuilder.append("\t ").append("Parameters: ").append(printValues()).append("\n");
-            stringBuilder.append("\t ").append("Is called?: ").append(getIsCalled()).append("\n");
+            buildTheString.append("\t ").append("The Parameters: ").append(printValues()).append("\n");
+            buildTheString.append("\t ").append("Is called?: ").append(getIsCalled()).append("\n");
         }
         else {
             if (getValues().size() > 0) {
-                stringBuilder.append("\t ").append(" Values: ").append(printValues()).append("\n");
+                buildTheString.append("\t ").append("The Values: ").append(printValues()).append("\n");
             } else {
-                stringBuilder.append("\t ").append(" Values: No assignments made").append("\n");
+                buildTheString.append("\t ").append("The Values: No assignments made").append("\n");
             }
-            stringBuilder.append("\t ").append("Is written to: ").append(getValues().size() > 0).append("\n");
-            stringBuilder.append("\t ").append("Is read from: ").append(getIsRead()).append("\n");
+            buildTheString.append("\t ").append("It is written to: ").append(getValues().size() > 0).append("\n");
+            buildTheString.append("\t ").append("It is read from: ").append(getIsRead()).append("\n");
         }
 
-        return stringBuilder.toString();
+        return buildTheString.toString();
 
     }
 }
